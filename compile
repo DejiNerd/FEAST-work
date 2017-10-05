@@ -1,0 +1,1 @@
+ifort -o driver_dfeast_sygv driver_dfeast_sygv.f90 -L$FEASTROOT/lib/x64 -lfeast_dense -lfeast -mkl
