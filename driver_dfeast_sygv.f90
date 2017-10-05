@@ -90,10 +90,9 @@ program driver
   ! print *, Zne
   Wne = (0.0d0,1.0d0)
   ! Wne = (1.0d0, 0.0d0)/fpm(2)
-  print *, Wne
-
+  
 ! !!! x for expert routine
-!   call dfeast_sygvx('L',N,A(1,1),N,B(1,1),N,fpm,epsout,loop,Emin,Emax,M0,E,X,M,res,info,Zne,Wne)
+  call dfeast_sygvx('L',N,A(1,1),N,B(1,1),N,fpm,epsout,loop,Emin,Emax,M0,E,X,M,res,info,Zne,Wne)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!! POST-PROCESSING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
