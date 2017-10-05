@@ -88,8 +88,8 @@ program driver
   Zne = (cos(theta * pi) * (1.0d0,0.0d0) + sin(theta * pi) * (0.0d0, 1.0d0)) * (Emax-Emin)/2.0d0
   Zne = Zne + (Emax+Emin)/2.0d0
   ! print *, Zne
-  ! Wne = (0.0d0,1.0d0)
-  Wne = (1.0d0, 0.0d0)/fpm(2)
+  Wne = (0.0d0,1.0d0)
+  ! Wne = (1.0d0, 0.0d0)/fpm(2)
   print *, Wne
 
 ! !!! x for expert routine
