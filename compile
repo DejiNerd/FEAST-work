@@ -1,1 +1,4 @@
 ifort -o driver_dfeast_sygv driver_dfeast_sygv.f90 -L$FEASTROOT/lib/x64 -lfeast_dense -lfeast -mkl
+ifort -o fullcontour fullcontour.f90 -L$FEASTROOT/lib/x64 -lfeast_dense -lfeast -mkl
+ifort -Wl,-stack_size,0x10000000 -o general driver_dfeast_gegv.f90 -L$FEASTROOT/lib/x64 -lfeast_dense -lfeast -mkl
+

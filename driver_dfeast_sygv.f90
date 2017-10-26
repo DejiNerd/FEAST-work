@@ -73,23 +73,24 @@ program driver
   !! fpm1 just prints
   fpm(1)=1
   !! fpm2 no of contour pts
-  fpm(2)=200
+  fpm(2)=100
   !! fpm4 does loops
-  fpm(4)=0
+  fpm(4)=5
   !! fpm16 equidistant trapezoid
   fpm(16)=1
 
   allocate(Zne(fpm(2)),Wne(fpm(2)))
   allocate(theta(fpm(2)))
-  ! call zfeast_contour(Emin, Emax,fpm(2), fpm(16), fpm(18), Zne, Wne)
-  ! print *, Wne
-  call dlarnv(1, (/100,200,40,7/), fpm(2), theta)
+  call zfeast_contour(Emin, Emax,fpm(2), fpm(16), fpm(18), Zne, Wne)
+  ! print *, Zne, Wne
+  ! call dlarnv(1, (/100,200,40,7/), fpm(2), theta)
   ! print *, theta
-  Zne = (cos(theta * pi) * (1.0d0,0.0d0) + sin(theta * pi) * (0.0d0, 1.0d0)) * (Emax-Emin)/2.0d0
-  Zne = Zne + (Emax+Emin)/2.0d0
-  ! print *, Zne
+  ! theta = 0.50d0
+  ! Zne = (cos(theta * pi) * (1.0d0,0.0d0) + sin(theta * pi) * (0.0d0, 1.0d0)) * (Emax-Emin)/2.0d0
+  ! Zne = Zne + (Emax+Emin)/2.0d0
+  ! print *, Zne, Wne
   ! Wne = (0.0d0,1.0d0)
-  Wne = (1.0d0, 0.0d0)/fpm(2)
+  ! Wne = (0.0d0, 1.0d0) / fpm(2)
   
 !!! x for expert routine
   call dfeast_sygvx('L',N,A(1,1),N,B(1,1),N,fpm,epsout,loop,Emin,Emax,M0,E,X,M,res,info,Zne,Wne)
