@@ -103,6 +103,7 @@ program driver_feast_sparse
         read(10,*) sEmax
      end if
 
+
   elseif (SHG=='g') then
 
      if ((PRE=='d').or.(PRE=='z')) then
@@ -116,17 +117,16 @@ program driver_feast_sparse
      end if
   end if
 
+  dEmin = huge(dEmin)
+  dEmax = -huge(dEmax)
+
   read(10,*) M0   ! size subspace
 
-  ! read(10,*) pc ! Some changes from default for fpm
+  read(10,*) pc ! Some changes from default for fpm
 
-  ! !!!!! hardcoding for now
-  ! ! do i=1,pc
-  ! !    read(10,*) j,fpm(j)
-  ! ! enddo
-  fpm(1) = 1
-  fpm(4) = 0
-  fpm(2) = 1
+  do i=1,pc
+     read(10,*) j,fpm(j)
+  enddo
 
   close(10)
 
@@ -184,6 +184,7 @@ program driver_feast_sparse
   elseif (PRE=='d') then
      allocate(dsa(1:nnza))
      call dcoo2csr(n,nnza,ica,jca,dca,isa,jsa,dsa)
+     call dgershgorin(n,nnza,isa,jsa,dsa,dEmin,dEmax)
   elseif (PRE=='c') then
      allocate(csa(1:nnza))
      call ccoo2csr(n,nnza,ica,jca,cca,isa,jsa,csa)
@@ -286,16 +287,23 @@ program driver_feast_sparse
         allocate(dE(1:M0))     ! Eigenvalue
         allocate(dres(1:M0))   ! Residual 
         allocate(dX(1:n,1:M0))
+
+        !!!!!!!!!!!!!!! DEJI !!!!!!!!!!!!!!!!!
+        !!!!!!!!! HERE  E intervals !!!!!!!!!!
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         call dfeast_scsrgv(UPLO,N,dsa,isa,jsa,dsb,isb,jsb,fpm,depsout,loop,dEmin,dEmax,M0,dE,dX,M,dres,info)
         minE = MINVAL(dE)
-        print *, 'cheeeeeet', minE
+
+        !!!! while loops termination's condition needs to be more robust !!!!
         do while (((dEmin - 0.1).le.minE).and.(minE.le.(dEmin + 0.1)))
           dEmax = minE + 0.5
           dEmin = minE - 0.5
           call dfeast_scsrgv(UPLO,N,dsa,isa,jsa,dsb,isb,jsb,fpm,depsout,loop,dEmin,dEmax,M0,dE,dX,M,dres,info)
           minE = MINVAL(dE)
         enddo
-        print *, 'cheeeeee', minE
+        print *, 'Minimum Eigenvalue =', dEmin
+        !!!!!!!! Deji - changes end here !!!!!!!
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
      elseif  ((PRE=='d').and.(EG=='e')) then 
         print *,'Routine  ','dfeast_scsrev'
@@ -477,7 +485,6 @@ IF (.true.) then
               elseif ((SHG=='s').and.(PRE=='c')) then
                  print *,i,cE(i),sres(i)
               elseif ((SHG=='s').and.(PRE=='d')) then
-                ! print *,'bruv!'
                  print *,i,dE(i),dres(i)
               elseif ((SHG=='s').and.(PRE=='s')) then
                  print *,i,sE(i),sres(i)
@@ -792,3 +799,38 @@ subroutine ccoo2csr(n,nnz,ic,jc,c,isa,jsa,sa)
 
 
 end subroutine ccoo2csr
+
+subroutine dgershgorin(n,nnza,isa,jsa,dsa,dEmin,dEmax)
+    implicit none
+    integer :: n,nnza
+    integer,dimension(*) :: isa,jsa
+    double precision :: dEmin, dEmax
+    double precision,dimension(*) :: dsa
+    !!!
+    integer :: x,z,i,index
+    double precision :: sum, center
+
+    z = 1
+    x = 1
+    sum = 0
+    do i = 1, n
+        do index = isa(i),isa(i+1)-1
+            if (x.EQ.jsa(z)) then
+                center = dsa(z)
+            else
+                sum = sum + ABS(dsa(z))
+            endif
+            z = z + 1
+        enddo
+        x = x + 1
+        if ((center - sum) < dEmin) then
+          dEmin = center - sum
+        endif
+        if ((center + sum) > dEmax) then
+          dEmax = center + sum
+        endif
+        center = 0
+        sum = 0
+    enddo
+    print *,'Min/Max:    ',dEmin,dEmax
+end subroutine dgershgorin
