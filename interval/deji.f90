@@ -23,20 +23,16 @@ program driver_feast_sparse
   integer :: n,nnza,nnzb
   real,dimension(:),allocatable :: ssa,ssb,sca,scb
   double precision,dimension(:),allocatable :: dsa,dsb,dca,dcb
-  complex,dimension(:),allocatable :: csa,csb,cca,ccb
-  complex(kind=kind(1.0d0)),dimension(:),allocatable :: zsa,zsb,zca,zcb
   integer,dimension(:),allocatable :: isa,jsa,isb,jsb,ica,jca,icb,jcb
 
 !!!!!!!!!!!!!!!!! Others
   integer :: t1,t2,tim
   integer :: i,j,k,pc
-  integer :: M0,M,info
+  integer :: M0,M,info, count, M1
   character(len=1) :: cc
 
-  double precision :: dEmin,dEmax,dr,minE
-  complex(kind=kind(1.0d0)):: zEmid
-  complex:: cEmid
-  real :: sEmin,sEmax,sr
+  double precision :: dEmin,dEmax,dr,minE,ddiff,dEmax0
+  real :: sEmin,sEmax,sr, sdiff
   double precision:: drea,dimg
   real:: srea,simg
 
@@ -82,43 +78,9 @@ program driver_feast_sparse
      elseif (PRE=='s') then
         read(10,*) sEmin
         read(10,*) sEmax
-     elseif (PRE=='z') then
-        read(10,*) drea,dimg
-        zEmid=drea*(1.0d0,0.0d0)+dimg*(0.0d0,1.0d0)
-        read(10,*) dr
-     elseif (PRE=='c') then
-        read(10,*) srea,simg
-        cEmid=srea*(1.0e0,0.0e0)+simg*(0.0e0,1.0e0)
-        read(10,*) sr
-     end if
-
-
-  elseif (SHG=='h') then
-
-     if (PRE=='z') then
-        read(10,*) dEmin
-        read(10,*) dEmax
-     else
-        read(10,*) sEmin
-        read(10,*) sEmax
-     end if
-
-
-  elseif (SHG=='g') then
-
-     if ((PRE=='d').or.(PRE=='z')) then
-        read(10,*) drea,dimg
-        zEmid=drea*(1.0d0,0.0d0)+dimg*(0.0d0,1.0d0)
-        read(10,*) dr
-     else
-        read(10,*) srea,simg
-        cEmid=srea*(1.0e0,0.0e0)+simg*(0.0e0,1.0e0)
-        read(10,*) sr
      end if
   end if
 
-  dEmin = huge(dEmin)
-  dEmax = -huge(dEmax)
 
   read(10,*) M0   ! size subspace
 
@@ -129,6 +91,13 @@ program driver_feast_sparse
   enddo
 
   close(10)
+
+  dEmin = huge(dEmin)
+  dEmax = -huge(dEmax)
+  M = huge(M)
+  fpm(14)=2 !! stochastic approach
+  ! fpm(14) = 0 !! non stochastic
+
 
 
 !!!!!!!!!!!read matrix A
@@ -158,18 +127,6 @@ program driver_feast_sparse
      do i=1,nnza
         read(10,*) ica(i),jca(i),dca(i)
      end do
-  elseif (PRE=='c') then
-     allocate(cca(nnza))
-     do i=1,nnza
-        read(10,*) ica(i),jca(i),srea,simg 
-        cca(i)=srea*(1.0e0,0.0e0)+simg*(0.0e0,1.0e0)
-     end do
-  elseif (PRE=='z') then
-     allocate(zca(nnza))
-     do i=1,nnza
-        read(10,*) ica(i),jca(i),drea,dimg 
-        zca(i)=drea*(1.0d0,0.0d0)+dimg*(0.0d0,1.0d0)
-     end do
   end if
   close(10)
 
@@ -185,80 +142,6 @@ program driver_feast_sparse
      allocate(dsa(1:nnza))
      call dcoo2csr(n,nnza,ica,jca,dca,isa,jsa,dsa)
      call dgershgorin(n,nnza,isa,jsa,dsa,dEmin,dEmax)
-  elseif (PRE=='c') then
-     allocate(csa(1:nnza))
-     call ccoo2csr(n,nnza,ica,jca,cca,isa,jsa,csa)
-  elseif (PRE=='z') then
-     allocate(zsa(1:nnza))
-     call zcoo2csr(n,nnza,ica,jca,zca,isa,jsa,zsa)
-  end if
-
-
-
-!!!!!!!!!!!read matrix B if any
-  if (EG=='g') then
-
-     open(10,file=trim(name)//'_B.mtx',status='old')
-     k=0
-     cc='%'
-     do while(cc=='%')
-        k=k+1 
-        read(10,'(A1)') cc
-     end do
-     close(10)
-
-     open(10,file=trim(name)//'_B.mtx',status='old')
-     do i=1,k-1
-        read(10,'(A1)') cc
-     enddo
-     read(10,*) n,n,nnzb
-     allocate(icb(nnzb))
-     allocate(jcb(nnzb))
-     if (PRE=='s') then
-        allocate(scb(nnzb))
-        do i=1,nnzb
-           read(10,*) icb(i),jcb(i),scb(i)
-        end do
-     elseif (PRE=='d') then
-        allocate(dcb(nnzb))
-        do i=1,nnzb
-           read(10,*) icb(i),jcb(i),dcb(i)
-        end do
-     elseif (PRE=='c') then
-        allocate(ccb(nnzb))
-        do i=1,nnzb
-           read(10,*) icb(i),jcb(i),srea,simg 
-           ccb(i)=srea*(1.0e0,0.0e0)+simg*(0.0e0,1.0e0)
-        end do
-     elseif (PRE=='z') then
-        allocate(zcb(nnzb))
-        do i=1,nnzb
-           read(10,*) icb(i),jcb(i),drea,dimg 
-           zcb(i)=drea*(1.0d0,0.0d0)+dimg*(0.0d0,1.0d0)
-        end do
-     end if
-     close(10)
-
-     !! create csr format
-     allocate(isb(1:n+1))
-     allocate(jsb(1:nnzb))
-
-
-     if (PRE=='s') then
-        allocate(ssb(1:nnzb))
-        call scoo2csr(n,nnzb,icb,jcb,scb,isb,jsb,ssb)
-     elseif (PRE=='d') then
-        allocate(dsb(1:nnzb))
-        call dcoo2csr(n,nnzb,icb,jcb,dcb,isb,jsb,dsb)
-     elseif (PRE=='c') then
-        allocate(csb(1:nnzb))
-        call ccoo2csr(n,nnzb,icb,jcb,ccb,isb,jsb,csb)
-     elseif (PRE=='z') then
-        allocate(zsb(1:nnzb))
-        call zcoo2csr(n,nnzb,icb,jcb,zcb,isb,jsb,zsb)
-     end if
-
-
   end if
 
 
@@ -280,187 +163,57 @@ program driver_feast_sparse
 
 !!!!!!!!!!!!!  FEAST SYMMETRIC
 
-  if (SHG=='s') then 
+if (SHG=='s') then 
 
-     if ((PRE=='d').and.(EG=='g')) then 
-        print *,'Routine  ','dfeast_scsrgv'
-        allocate(dE(1:M0))     ! Eigenvalue
-        allocate(dres(1:M0))   ! Residual 
-        allocate(dX(1:n,1:M0))
+   if  ((PRE=='d').and.(EG=='e')) then 
+      print *,'Routine  ','dfeast_scsrev'
+      allocate(dE(1:M0))     ! Eigenvalue
+      allocate(dres(1:M0))   ! Residual 
+      allocate(dX(1:n,1:M0))
+      dEmax0= dEmax
+      M1 = M0/2 ! number of eigenvalues
+      ddiff = (dEmax - dEmin) * M0/n
+      count = 0
+      fpm(1) = 0
+      i = 3
+      dEmax = dEmax0/(2**i)
+      do while ((M < M1).or.(M > M0))
+        count = count + 1
+        i = i + 1
+        ddiff = (dEmax0 -dEmin)/(2**i)
+        if (M > M0) then
+          dEmax = dEmax - ddiff
+        else if (M < M1) then
+          dEmax = dEmax + ddiff
+        endif
+        fpm(4) = 0
+        call dfeast_scsrev(UPLO,N,dsa,isa,jsa,fpm,depsout,loop,dEmin,dEmax,10,dE,dX,M,dres,info)
+        print *, 'Iteration count', count, 'Estimate', M
+      enddo
+      fpm(1)=0
+      fpm(4)=20
+      fpm(14)=0
+      call dfeast_scsrev(UPLO,N,dsa,isa,jsa,fpm,depsout,loop,dEmin,dEmax,M0,dE,dX,M,dres,info)
+      print *, 'Number of iterations' , count
 
-        !!!!!!!!!!!!!!! DEJI !!!!!!!!!!!!!!!!!
-        !!!!!!!!! HERE  E intervals !!!!!!!!!!
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        call dfeast_scsrgv(UPLO,N,dsa,isa,jsa,dsb,isb,jsb,fpm,depsout,loop,dEmin,dEmax,M0,dE,dX,M,dres,info)
-        minE = MINVAL(dE)
-
-        !!!! while loops termination's condition needs to be more robust !!!!
-        do while (((dEmin - 0.1).le.minE).and.(minE.le.(dEmin + 0.1)))
-          dEmax = minE + 0.5
-          dEmin = minE - 0.5
-          call dfeast_scsrgv(UPLO,N,dsa,isa,jsa,dsb,isb,jsb,fpm,depsout,loop,dEmin,dEmax,M0,dE,dX,M,dres,info)
-          minE = MINVAL(dE)
-        enddo
-        print *, 'Minimum Eigenvalue =', dEmin
-        !!!!!!!! Deji - changes end here !!!!!!!
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-     elseif  ((PRE=='d').and.(EG=='e')) then 
-        print *,'Routine  ','dfeast_scsrev'
-        allocate(dE(1:M0))     ! Eigenvalue
-        allocate(dres(1:M0))   ! Residual 
-        allocate(dX(1:n,1:M0))
-        call dfeast_scsrev(UPLO,N,dsa,isa,jsa,fpm,depsout,loop,dEmin,dEmax,M0,dE,dX,M,dres,info)
-
-     elseif ((PRE=='s').and.(EG=='g')) then 
-        print *,'Routine  ','sfeast_scsrgv'
-        allocate(sE(1:M0))     ! Eigenvalue
-        allocate(sres(1:M0))   ! Residual 
-        allocate(sX(1:n,1:M0))
-        call sfeast_scsrgv(UPLO,N,ssa,isa,jsa,ssb,isb,jsb,fpm,sepsout,loop,sEmin,sEmax,M0,sE,sX,M,sres,info)
-
-     elseif ((PRE=='s').and.(EG=='e')) then 
-        print *,'Routine  ','sfeast_scsrev'
-        allocate(sE(1:M0))     ! Eigenvalue
-        allocate(sres(1:M0))   ! Residual 
-        allocate(sX(1:n,1:M0))
+   elseif ((PRE=='s').and.(EG=='e')) then 
+      print *,'Routine  ','sfeast_scsrev'
+      allocate(sE(1:M0))     ! Eigenvalue
+      allocate(sres(1:M0))   ! Residual 
+      allocate(sX(1:n,1:M0))
+      do while (M>M0)
+       !!! M is N, but figure out what N is
+        sdiff = (sEmax - sEmin) * M0/M
+        sEmin = sEmin + sdiff
         call sfeast_scsrev(UPLO,N,ssa,isa,jsa,fpm,sepsout,loop,sEmin,sEmax,M0,sE,sX,M,sres,info)
+      enddo
+      fpm(1)=1
+      fpm(14)=0
+      call sfeast_scsrev(UPLO,N,ssa,isa,jsa,fpm,sepsout,loop,sEmin,sEmax,M0,sE,sX,M,sres,info)
 
-     elseif ((PRE=='z').and.(EG=='g')) then 
-        print *,'Routine  ','zfeast_scsrgv'
-        allocate(zE(1:M0))     ! Eigenvalue
-        allocate(dres(1:M0))   ! Residual 
-        allocate(zX(1:n,1:M0))
-        call zfeast_scsrgv(UPLO,N,zsa,isa,jsa,zsb,isb,jsb,fpm,depsout,loop,zEmid,dr,M0,zE,zX,M,dres,info)
+   end if
 
-     elseif ((PRE=='z').and.(EG=='e')) then 
-        print *,'Routine  ','zfeast_scsrev'
-        allocate(zE(1:M0))     ! Eigenvalue
-        allocate(dres(1:M0))   ! Residual 
-        allocate(zX(1:n,1:M0))
-        call zfeast_scsrev(UPLO,N,zsa,isa,jsa,fpm,depsout,loop,zEmid,dr,M0,zE,zX,M,dres,info)
-
-     elseif ((PRE=='c').and.(EG=='g')) then 
-        print *,'Routine  ','cfeast_scsrgv'
-        allocate(cE(1:M0))     ! Eigenvalue
-        allocate(sres(1:M0))   ! Residual 
-        allocate(cX(1:n,1:M0))
-        call cfeast_scsrgv(UPLO,N,csa,isa,jsa,csb,isb,jsb,fpm,sepsout,loop,cEmid,sr,M0,cE,cX,M,sres,info)
-
-     elseif ((PRE=='c').and.(EG=='e')) then 
-        print *,'Routine  ','cfeast_scsrev'
-        allocate(cE(1:M0))     ! Eigenvalue
-        allocate(sres(1:M0))   ! Residual 
-        allocate(cX(1:n,1:M0))
-        call cfeast_scsrev(UPLO,N,csa,isa,jsa,fpm,sepsout,loop,cEmid,sr,M0,cE,cX,M,sres,info)
-
-     end if
-
-
-
-!!!!!!!!!!!!!  FEAST HERMITIAN
-
-  elseif (SHG=='h') then 
-
-
-     if ((PRE=='z').and.(EG=='g')) then 
-        print *,'Routine  ','zfeast_hcsrgv'
-        allocate(dE(1:M0))     ! Eigenvalue
-        allocate(dres(1:M0))   ! Residual 
-        allocate(zX(1:n,1:M0))
-        call zfeast_hcsrgv(UPLO,N,zsa,isa,jsa,zsb,isb,jsb,fpm,depsout,loop,dEmin,dEmax,M0,dE,zX,M,dres,info)
-
-     elseif ((PRE=='z').and.(EG=='e')) then 
-        print *,'Routine  ','zfeast_hcsrev'
-        allocate(dE(1:M0))     ! Eigenvalue
-        allocate(dres(1:M0))   ! Residual 
-        allocate(zX(1:n,1:M0))
-        call zfeast_hcsrev(UPLO,N,zsa,isa,jsa,fpm,depsout,loop,dEmin,dEmax,M0,dE,zX,M,dres,info)
-
-     elseif ((PRE=='c').and.(EG=='g')) then 
-        print *,'Routine  ','cfeast_hcsrgv'
-        allocate(sE(1:M0))     ! Eigenvalue
-        allocate(sres(1:M0))   ! Residual 
-        allocate(cX(1:n,1:M0))
-        call cfeast_hcsrgv(UPLO,N,csa,isa,jsa,csb,isb,jsb,fpm,sepsout,loop,sEmin,sEmax,M0,sE,cX,M,sres,info)
-
-     elseif ((PRE=='c').and.(EG=='e')) then 
-        print *,'Routine  ','cfeast_hcsrev'
-        allocate(sE(1:M0))     ! Eigenvalue
-        allocate(sres(1:M0))   ! Residual 
-        allocate(cX(1:n,1:M0))
-        call cfeast_hcsrev(UPLO,N,csa,isa,jsa,fpm,sepsout,loop,sEmin,sEmax,M0,sE,cX,M,sres,info)
-
-     end if
-
-
-
-!!!!!!!!!!!!!  FEAST GENERAL
-
-  elseif (SHG=='g') then 
-
-
-     if ((PRE=='d').and.(EG=='g')) then 
-        print *,'Routine  ','dfeast_gcsrgv'
-        allocate(zE(1:M0))     ! Eigenvalue
-        allocate(dres(1:2*M0))   ! Residual 
-        allocate(zX(1:n,1:2*M0))
-        call dfeast_gcsrgv(N,dsa,isa,jsa,dsb,isb,jsb,fpm,depsout,loop,zEmid,dr,M0,zE,zX,M,dres,info)
-
-
-     elseif  ((PRE=='d').and.(EG=='e')) then 
-        print *,'Routine  ','dfeast_gcsrev'
-        allocate(zE(1:M0))     ! Eigenvalue
-        allocate(dres(1:2*M0))   ! Residual 
-        allocate(zX(1:n,1:2*M0))
-        call dfeast_gcsrev(N,dsa,isa,jsa,fpm,depsout,loop,zEmid,dr,M0,zE,zX,M,dres,info)
-
-     elseif ((PRE=='s').and.(EG=='g')) then 
-        print *,'Routine  ','sfeast_gcsrgv'
-        allocate(cE(1:M0))     ! Eigenvalue
-        allocate(sres(1:2*M0))   ! Residual 
-        allocate(cX(1:n,1:2*M0))
-        call sfeast_gcsrgv(N,ssa,isa,jsa,ssb,isb,jsb,fpm,sepsout,loop,cEmid,sr,M0,cE,cX,M,sres,info)
-
-     elseif ((PRE=='s').and.(EG=='e')) then 
-        print *,'Routine  ','sfeast_gcsrev'
-        allocate(cE(1:M0))     ! Eigenvalue
-        allocate(sres(1:2*M0))   ! Residual 
-        allocate(cX(1:n,1:2*M0))
-        call sfeast_gcsrev(N,ssa,isa,jsa,fpm,sepsout,loop,cEmid,sr,M0,cE,cX,M,sres,info)
-
-     elseif ((PRE=='z').and.(EG=='g')) then 
-        print *,'Routine  ','zfeast_gcsrgv'
-        allocate(zE(1:M0))     ! Eigenvalue
-        allocate(dres(1:2*M0))   ! Residual 
-        allocate(zX(1:n,1:2*M0))
-        call zfeast_gcsrgv(N,zsa,isa,jsa,zsb,isb,jsb,fpm,depsout,loop,zEmid,dr,M0,zE,zX,M,dres,info)
-
-     elseif ((PRE=='z').and.(EG=='e')) then 
-        print *,'Routine  ','zfeast_gcsrev'
-        allocate(zE(1:M0))     ! Eigenvalue
-        allocate(dres(1:2*M0))   ! Residual 
-        allocate(zX(1:n,1:2*M0))
-        call zfeast_gcsrev(N,zsa,isa,jsa,fpm,depsout,loop,zEmid,dr,M0,zE,zX,M,dres,info)
-
-     elseif ((PRE=='c').and.(EG=='g')) then 
-        print *,'Routine  ','cfeast_gcsrgv'
-        allocate(cE(1:M0))     ! Eigenvalue
-        allocate(sres(1:2*M0))   ! Residual 
-        allocate(cX(1:n,1:2*M0))
-        call cfeast_gcsrgv(N,csa,isa,jsa,csb,isb,jsb,fpm,sepsout,loop,cEmid,sr,M0,cE,cX,M,sres,info)
-
-     elseif ((PRE=='c').and.(EG=='e')) then 
-        print *,'Routine  ','cfeast_gcsrev'
-        allocate(cE(1:M0))     ! Eigenvalue
-        allocate(sres(1:2*M0))   ! Residual 
-        allocate(cX(1:n,1:2*M0))
-        call cfeast_gcsrev(N,csa,isa,jsa,fpm,sepsout,loop,cEmid,sr,M0,cE,cX,M,sres,info)
-
-     end if
-
-  end if
-
+end if
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!! POST-PROCESSING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -480,17 +233,10 @@ IF (.true.) then
         if (SHG/='g') then
            print *,'inside interval'
            do i=1,M0
-              if ((SHG=='s').and.(PRE=='z')) then
-                 print *,i,zE(i),dres(i)
-              elseif ((SHG=='s').and.(PRE=='c')) then
-                 print *,i,cE(i),sres(i)
-              elseif ((SHG=='s').and.(PRE=='d')) then
+
+              if ((SHG=='s').and.(PRE=='d')) then
                  print *,i,dE(i),dres(i)
               elseif ((SHG=='s').and.(PRE=='s')) then
-                 print *,i,sE(i),sres(i)
-              elseif ((SHG=='h').and.(PRE=='z')) then
-                 print *,i,dE(i),dres(i)
-              elseif ((SHG=='h').and.(PRE=='c')) then
                  print *,i,sE(i),sres(i)
               end if
               if (i==M) then 
@@ -498,20 +244,6 @@ IF (.true.) then
                 print *,'outside interval'
               endif
            enddo
-        ! else
-        !    print *,'inside interval'
-        !    do i=1,M0
-        !       if ((PRE=='s').or.(PRE=='c')) then
-        !          print *,i,cE(i),sres(i),sres(i+M0)
-        !       else
-        !          print *,i,zE(i),dres(i),dres(i+M0)
-        !       end if
-        !       if (i==M) then
-        !         print *,''
-        !         print *,'outside interval'
-        !       endif
-        !    enddo
-
         end if
 
      elseif (fpm(14)==2) then
@@ -529,21 +261,14 @@ IF (.true.) then
      print *,'SIMULATION TIME',(t2-t1)*1.0d0/tim
 
 
-     if ((SHG=='g').or.((SHG=='s').and.((PRE=='c').or.(PRE=='z')))) then
-        print *,'# Search interval [Emid,r]'
-        if ((PRE=='s').or.(PRE=='c')) then
-           print *,cEmid,sr
-        else
-           print *,zEmid,dr
-        end if
-     else
-        print *,'# Search interval [Emin,Emax]'
-        if ((PRE=='s').or.(PRE=='c')) then
-           print *,sEmin,sEmax
-        else
-           print *,dEmin,dEmax
-        end if
-     end if
+
+     
+      print *,'# Search interval [Emin,Emax]'
+      if ((PRE=='s').or.(PRE=='c')) then
+         print *,sEmin,sEmax
+      else
+         print *,dEmin,dEmax
+      end if
 
      if (fpm(14)==2) then
         print *,'Subspace size M0        ',M0
@@ -644,58 +369,6 @@ end subroutine dcoo2csr
 
 
 
-subroutine zcoo2csr(n,nnz,ic,jc,c,isa,jsa,sa)
-  implicit none
-  integer :: n,nnz
-  integer,dimension(*) :: ic,jc,isa,jsa
-  complex(kind=kind(1.0d0)),dimension(*) :: c,sa
-!!!
-  integer :: k,k1,i,j,idum
-  integer,dimension(n) :: iloc
-  complex(kind=kind(1.0d0)):: adum
-
-  isa(1:N+1) = 0  
-  !find how many elements in row
-  do  k=1, nnz
-     isa(ic(k)) = isa(ic(k))+1
-  end do
-
-  !build isa
-  k = 1
-  do  i=1,N+1
-     k1 = isa(i)
-     isa(i) = k
-     k = k+k1
-  end do
-
-  iloc(1:n)=isa(1:n)
-  !Build jsa, sa - increment local row counter
-  do  k=1, nnz
-     sa(iloc(ic(k))) =  c(k)
-     jsa(iloc(ic(k))) = jc(k)
-     iloc(ic(k)) = iloc(ic(k))+1
-  end do
-  ! Reorder by increasing column
-  do i=1,n
-     do k=isa(i),isa(i+1)-1
-        do k1=k,isa(i+1)-1
-           if (jsa(k1)<jsa(k)) then
-              idum=jsa(k)
-              jsa(k)=jsa(k1)
-              jsa(k1)=idum
-              adum=sa(k)
-              sa(k)=sa(k1)
-              sa(k1)=adum
-           endif
-        enddo
-     enddo
-  enddo
-
-
-end subroutine zcoo2csr
-
-
-
 subroutine scoo2csr(n,nnz,ic,jc,c,isa,jsa,sa)
   implicit none
   integer :: n,nnz
@@ -748,59 +421,13 @@ subroutine scoo2csr(n,nnz,ic,jc,c,isa,jsa,sa)
 end subroutine scoo2csr
 
 
-
-
-subroutine ccoo2csr(n,nnz,ic,jc,c,isa,jsa,sa)
-  implicit none
-  integer :: n,nnz
-  integer,dimension(*) :: ic,jc,isa,jsa
-  complex,dimension(*) :: c,sa
-!!!
-  integer :: k,k1,i,j,idum
-  integer,dimension(n) :: iloc
-  complex:: adum
-
-  isa(1:N+1) = 0  
-  !find how many elements in row
-  do  k=1, nnz
-     isa(ic(k)) = isa(ic(k))+1
-  end do
-
-  !build isa
-  k = 1
-  do  i=1,N+1
-     k1 = isa(i)
-     isa(i) = k
-     k = k+k1
-  end do
-
-  iloc(1:n)=isa(1:n)
-  !Build jsa, sa - increment local row counter
-  do  k=1, nnz
-     sa(iloc(ic(k))) =  c(k)
-     jsa(iloc(ic(k))) = jc(k)
-     iloc(ic(k)) = iloc(ic(k))+1
-  end do
-  ! Reorder by increasing column
-  do i=1,n
-     do k=isa(i),isa(i+1)-1
-        do k1=k,isa(i+1)-1
-           if (jsa(k1)<jsa(k)) then
-              idum=jsa(k)
-              jsa(k)=jsa(k1)
-              jsa(k1)=idum
-              adum=sa(k)
-              sa(k)=sa(k1)
-              sa(k1)=adum
-           endif
-        enddo
-     enddo
-  enddo
-
-
-end subroutine ccoo2csr
-
 subroutine dgershgorin(n,nnza,isa,jsa,dsa,dEmin,dEmax)
+    !!! The array dsa is of length NNZ and holds all- 
+    !!! -the nonzero entries of the matrix(M) in left-to-right top-to-bottom ("row-major") order.
+    !!! The array isa is of length n + 1. It's what enables us to iterate the CSR
+    !!! jsa, contains the column index in M of each element of dsa and hence is of length NNZ as well.
+    !!! dEmin and dEmax represent the variables that store the bound when gersh is complete
+
     implicit none
     integer :: n,nnza
     integer,dimension(*) :: isa,jsa
@@ -808,29 +435,29 @@ subroutine dgershgorin(n,nnza,isa,jsa,dsa,dEmin,dEmax)
     double precision,dimension(*) :: dsa
     !!!
     integer :: x,z,i,index
-    double precision :: sum, center
+    double precision :: radius, center
 
     z = 1
     x = 1
-    sum = 0
+    radius = 0
     do i = 1, n
         do index = isa(i),isa(i+1)-1
             if (x.EQ.jsa(z)) then
                 center = dsa(z)
             else
-                sum = sum + ABS(dsa(z))
+                radius = radius + ABS(dsa(z))
             endif
             z = z + 1
         enddo
         x = x + 1
-        if ((center - sum) < dEmin) then
-          dEmin = center - sum
+        if ((center - radius) < dEmin) then
+          dEmin = center - radius
         endif
-        if ((center + sum) > dEmax) then
-          dEmax = center + sum
+        if ((center + radius) > dEmax) then
+          dEmax = center + radius
         endif
         center = 0
-        sum = 0
+        radius = 0
     enddo
     print *,'Min/Max:    ',dEmin,dEmax
 end subroutine dgershgorin
