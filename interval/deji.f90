@@ -31,7 +31,7 @@ program driver_feast_sparse
   integer :: M0,M,info, count, M1
   character(len=1) :: cc
 
-  double precision :: dEmin,dEmax,dr,minE,ddiff,dEmax0
+  double precision :: dEmin,dEmax,dr,minE,ddiff,dEmax0,dEmin0
   real :: sEmin,sEmax,sr, sdiff
   double precision:: drea,dimg
   real:: srea,simg
@@ -70,16 +70,16 @@ program driver_feast_sparse
   read(10,*) PRE  ! "PRE"==(s,d,c,z) resp. (single real,double real,complex,double complex) 
   read(10,*) UPLO ! UPLO==(F,L,U) reps. (Full csr, Lower csr, Upper csr) 
 
-  if (SHG=='s') then
+  ! if (SHG=='s') then
 
-     if (PRE=='d') then
-        read(10,*) dEmin
-        read(10,*) dEmax
-     elseif (PRE=='s') then
-        read(10,*) sEmin
-        read(10,*) sEmax
-     end if
-  end if
+  !    if (PRE=='d') then
+  !       read(10,*) dEmin
+  !       read(10,*) dEmax
+  !    elseif (PRE=='s') then
+  !       read(10,*) sEmin
+  !       read(10,*) sEmax
+  !    end if
+  ! end if
 
 
   read(10,*) M0   ! size subspace
@@ -95,7 +95,7 @@ program driver_feast_sparse
   dEmin = huge(dEmin)
   dEmax = -huge(dEmax)
   M = huge(M)
-  fpm(14)=2 !! stochastic approach
+  ! fpm(14)=2 !! stochastic approach
   ! fpm(14) = 0 !! non stochastic
 
 
@@ -170,27 +170,44 @@ if (SHG=='s') then
       allocate(dE(1:M0))     ! Eigenvalue
       allocate(dres(1:M0))   ! Residual 
       allocate(dX(1:n,1:M0))
-      dEmax0= dEmax
+      dEmax0 = dEmax
+      dEmin0 = dEmin 
       M1 = M0/2 ! number of eigenvalues
-      ddiff = (dEmax - dEmin) * M0/n
+      ! ddiff = (dEmax - dEmin) * M0/n
       count = 0
-      fpm(1) = 0
       i = 3
-      dEmax = dEmax0/(2**i)
-      do while ((M < M1).or.(M > M0))
+      if (fpm(56) == 0) then
+        dEmax = (dEmax - dEmin)/(2**i) + dEmin
+      else
+        dEmin = dEmax - (dEmax - dEmin)/(2**i)
+      endif
+      call dfeast_scsrev(UPLO,N,dsa,isa,jsa,fpm,depsout,loop,dEmin,dEmax,10,dE,dX,M,dres,info)
+      print *, 'origin ', dEmin, dEmax, M
+      do while ((M < M1).or.(M > (M0 * 3/4)))
         count = count + 1
         i = i + 1
-        ddiff = (dEmax0 -dEmin)/(2**i)
-        if (M > M0) then
-          dEmax = dEmax - ddiff
+        ddiff = (dEmax0 -dEmin0)/(2**i) 
+        if (M > M0 * 3/4) then
+          if(fpm(56) == 0) then
+            dEmax = dEmax - ddiff
+          else
+            dEmin = dEmin + ddiff
+          endif
         else if (M < M1) then
-          dEmax = dEmax + ddiff
+          if (fpm(56) == 0) then
+            dEmax = dEmax + ddiff
+          else
+            dEmin = dEmin - ddiff
+          endif
         endif
-        fpm(4) = 0
+
         call dfeast_scsrev(UPLO,N,dsa,isa,jsa,fpm,depsout,loop,dEmin,dEmax,10,dE,dX,M,dres,info)
+        print *, dEmin, dEmax
         print *, 'Iteration count', count, 'Estimate', M
       enddo
-      fpm(1)=0
+      
+      fpm(1)=1
+      fpm(2)=5
       fpm(4)=20
       fpm(14)=0
       call dfeast_scsrev(UPLO,N,dsa,isa,jsa,fpm,depsout,loop,dEmin,dEmax,M0,dE,dX,M,dres,info)
@@ -434,8 +451,9 @@ subroutine dgershgorin(n,nnza,isa,jsa,dsa,dEmin,dEmax)
     double precision :: dEmin, dEmax
     double precision,dimension(*) :: dsa
     !!!
-    integer :: x,z,i,index
-    double precision :: radius, center
+    integer :: x,k,z,i,index
+    double precision :: radius, center, theta
+    open(10,file="gershcircle",status="replace")
 
     z = 1
     x = 1
@@ -456,8 +474,21 @@ subroutine dgershgorin(n,nnza,isa,jsa,dsa,dEmin,dEmax)
         if ((center + radius) > dEmax) then
           dEmax = center + radius
         endif
+
+        !write(10, *) center,radius
+        do k=1,20
+          theta=(k-1)*2.0d0*3.14159265359d0/20.0d0
+          ! write(10,*) center+sin(theta)*radius,center+cos(theta)*radius
+          write(10,*) radius*cos(theta)+center, radius*sin(theta)
+        enddo
+          theta=(1-1)*2.0d0*3.14159265359d0/20.0d0
+          ! write(10,*) center+sin(theta)*radius,center+cos(theta)*radius
+          write(10,*) radius*cos(theta)+center, radius*sin(theta)
+        write(10,*)
+        write(10,*)
         center = 0
         radius = 0
     enddo
+    close(10)
     print *,'Min/Max:    ',dEmin,dEmax
 end subroutine dgershgorin
