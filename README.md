@@ -1,5 +1,5 @@
 # FEAST-work
-Honors thesis
+## Honors thesis
 
 The eigenvalue problem, Ax = /\x, is ubiquitous in Science and Engineering. Many numerical
 tools have been developed over the years to compute eigenvalues and eigenvectors. The
@@ -10,3 +10,5 @@ eigenvalues. This project proposes a tool for computing the search interval of M
 lowest or largest eigenvalues. We employ procedures such as Gershgorin’s circle theorem
 and FEAST stochastic techniques in our approach. The resulting search interval which is
 obtained at a relatively low cost can be used as an input for FEAST.
+
+More info: http://www.feast-solver.org/
